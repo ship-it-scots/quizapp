@@ -116,7 +116,6 @@
 <div id="toast"></div>
 
 <script>
-    // Cole a URL do seu Google Apps Script diretamente entre as aspas
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec";
 
     const questions = [
@@ -156,7 +155,7 @@
     }
 
     async function submitQuiz() {
-        if (!SCRIPT_URL || SCRIPT_URL === "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec") {
+        if (!SCRIPT_URL || SCRIPT_URL.trim() === "") {
             return alert("Por favor, configure a URL do seu Google Apps Script dentro da variável SCRIPT_URL no arquivo HTML!");
         }
 
@@ -199,7 +198,7 @@
 
     async function loadHistory() {
         const tbody = document.getElementById("historyTableBody");
-        if (!SCRIPT_URL || SCRIPT_URL === "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec") {
+        if (!SCRIPT_URL || SCRIPT_URL.trim() === "") {
             return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">URL do Script não configurada no código.</td></tr>`;
         }
 
