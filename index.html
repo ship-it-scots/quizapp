@@ -117,7 +117,7 @@
 
 <script>
     // Cole a URL do seu Google Apps Script diretamente entre as aspas
-    const SCRIPT_URL = "COLE_SUA_URL_DO_GOOGLE_APPS_SCRIPT_AQUI";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec";
 
     const questions = [
         { id: 1, question: "Ao lançar um dado honesto de 6 faces, qual é a probabilidade de obter um número primo?", options: ["1/6", "1/3", "1/2", "2/3", "5/6"], correct: 2, explanation: "Os números primos são 2, 3 e 5. Logo, 3/6 = 1/2." },
@@ -156,7 +156,7 @@
     }
 
     async function submitQuiz() {
-        if (!SCRIPT_URL || SCRIPT_URL === "COLE_SUA_URL_DO_GOOGLE_APPS_SCRIPT_AQUI") {
+        if (!SCRIPT_URL || SCRIPT_URL === "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec") {
             return alert("Por favor, configure a URL do seu Google Apps Script dentro da variável SCRIPT_URL no arquivo HTML!");
         }
 
