@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Plataforma de Simulados & Desempenho</title>
-    <!-- Chart.js para visualização do gráfico na aba de histórico -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -25,20 +24,20 @@
         header { text-align: center; margin-bottom: 24px; }
         header h1 { font-size: 2rem; color: #0f172a; }
 
-        /* Abas */
         .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
         .tab-btn { background: none; border: none; padding: 10px 20px; font-size: 1rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; }
         .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
-        /* Cards e Questões */
         .card { background: var(--card-bg); border-radius: var(--radius); padding: 24px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
         .question-card { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
         .question-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 12px; }
         .options-list { display: flex; flex-direction: column; gap: 8px; }
         .option-item { display: flex; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
         .option-item input { margin-right: 12px; }
+
+        select, input[type="text"] { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
 
         .btn { background: var(--primary); color: white; border: none; padding: 12px 24px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; }
         .btn:hover { background: var(--primary-hover); }
@@ -47,7 +46,6 @@
         .feedback.correct { background: #dcfce7; color: #15803d; display: block; }
         .feedback.incorrect { background: #fee2e2; color: #b91c1c; display: block; }
 
-        /* Estatísticas */
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .stat-card { background: #f8fafc; border: 1px solid var(--border); padding: 16px; border-radius: var(--radius); text-align: center; }
         .stat-card p { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
@@ -63,29 +61,42 @@
 
 <div class="container">
     <header>
-        <h1>🎯 Plataforma de Simulados</h1>
-        <p>Responda às questões e acompanhe seu desempenho</p>
+        <h1>🎯 Plataforma de Simulados Multitópicos</h1>
+        <p>Selecione o questionário desejado e acompanhe seu desempenho</p>
     </header>
 
     <div class="tabs">
         <button class="tab-btn active" onclick="switchTab('quiz-tab', this)">📝 Realizar Simulado</button>
-        <button class="tab-btn" onclick="switchTab('history-tab', this); loadHistory();">📊 Histórico & Desempenho</button>
+        <button class="tab-btn" onclick="switchTab('history-tab', this)">📊 Histórico & Desempenho</button>
     </div>
 
     <!-- ABA 1: SIMULADO -->
     <div id="quiz-tab" class="tab-content active">
         <div class="card">
             <div style="margin-bottom: 16px;">
+                <label><strong>Selecione o Quiz:</strong></label>
+                <select id="quizSelector" onchange="changeQuiz()">
+                    <option value="">Carregando questionários da planilha...</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 16px;">
                 <label><strong>Seu Nome / Identificação:</strong></label>
-                <input type="text" id="userName" style="width:100%; padding:8px; margin-top:4px;" value="Aluno">
+                <input type="text" id="userName" value="Aluno">
             </div>
             <div id="questionsContainer"></div>
             <button class="btn" onclick="submitQuiz()">Finalizar e Salvar Resultado</button>
         </div>
     </div>
 
-    <!-- ABA 2: HISTÓRICO & DESEMPENHO -->
+    <!-- ABA 2: HISTÓRICO -->
     <div id="history-tab" class="tab-content">
+        <div class="card" style="margin-bottom: 16px;">
+            <label><strong>Filtrar Histórico por Quiz:</strong></label>
+            <select id="historyFilter" onchange="renderHistoryTable()">
+                <option value="ALL">Todos os Quizzes</option>
+            </select>
+        </div>
+
         <div class="stats-grid">
             <div class="stat-card"><h3>Total de Testes</h3><p id="statTotalTests">0</p></div>
             <div class="stat-card"><h3>Média Geral</h3><p id="statAvgScore">0%</p></div>
@@ -98,14 +109,14 @@
         </div>
 
         <div class="card">
-            <h3>Histórico no Google Sheets</h3>
+            <h3>Histórico Detalhado</h3>
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
-                        <tr><th>Data/Hora</th><th>Usuário</th><th>Acertos</th><th>Total</th><th>Aproveitamento</th></tr>
+                        <tr><th>Data/Hora</th><th>Usuário</th><th>Quiz</th><th>Acertos</th><th>Total</th><th>Aproveitamento</th></tr>
                     </thead>
                     <tbody id="historyTableBody">
-                        <tr><td colspan="5" style="text-align:center;">Carregando histórico...</td></tr>
+                        <tr><td colspan="6" style="text-align:center;">Carregando histórico...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -116,18 +127,15 @@
 <div id="toast"></div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxQEcx7RZgjUxvBYCNyLwCE1TKW4KpFLpKLKXUhApUpoUXb471hrqjtneLDd3W1aFNF/exec";
 
-    const questions = [
-        { id: 1, question: "Ao lançar um dado honesto de 6 faces, qual é a probabilidade de obter um número primo?", options: ["1/6", "1/3", "1/2", "2/3", "5/6"], correct: 2, explanation: "Os números primos são 2, 3 e 5. Logo, 3/6 = 1/2." },
-        { id: 2, question: "Em uma urna há 5 bolas vermelhas, 3 azuis e 2 amarelas. Retirando uma bola ao acaso, qual a probabilidade de NÃO ser azul?", options: ["20%", "30%", "50%", "70%", "80%"], correct: 3, explanation: "Bolas não azuis = 7 de 10. Logo, 7/10 = 70%." },
-        { id: 3, question: "Dois dados são lançados. Qual a probabilidade de a soma ser igual a 7?", options: ["1/36", "1/12", "1/6", "5/36", "1/4"], correct: 2, explanation: "São 6 combinações favoráveis de 36. 6/36 = 1/6." }
-    ];
-
+    let allQuizzes = [];
+    let allHistory = [];
+    let currentQuiz = null;
     let chartInstance = null;
 
     document.addEventListener("DOMContentLoaded", () => {
-        renderQuiz();
+        loadDataFromSheets();
     });
 
     function switchTab(tabId, btn) {
@@ -137,9 +145,52 @@
         btn.classList.add("active");
     }
 
-    function renderQuiz() {
+    async function loadDataFromSheets() {
+        showToast("Carregando dados da planilha...");
+        try {
+            const res = await fetch(SCRIPT_URL);
+            const data = await res.json();
+            
+            allQuizzes = data.quizzes || [];
+            allHistory = data.history || [];
+
+            populateQuizSelectors();
+            if (allQuizzes.length > 0) {
+                currentQuiz = allQuizzes[0];
+                renderQuestions();
+            }
+            renderHistoryTable();
+            showToast("Dados carregados com sucesso!");
+        } catch (e) {
+            showToast("Erro ao carregar dados do Google Sheets.");
+        }
+    }
+
+    function populateQuizSelectors() {
+        const quizSelector = document.getElementById("quizSelector");
+        const historyFilter = document.getElementById("historyFilter");
+
+        quizSelector.innerHTML = allQuizzes.map((q, idx) => `<option value="${idx}">${q.title}</option>`).join('');
+        historyFilter.innerHTML = `<option value="ALL">Todos os Quizzes</option>` + 
+            allQuizzes.map(q => `<option value="${q.title}">${q.title}</option>`).join('');
+    }
+
+    function changeQuiz() {
+        const idx = document.getElementById("quizSelector").value;
+        if (allQuizzes[idx]) {
+            currentQuiz = allQuizzes[idx];
+            renderQuestions();
+        }
+    }
+
+    function renderQuestions() {
         const container = document.getElementById("questionsContainer");
-        container.innerHTML = questions.map((q, idx) => `
+        if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
+            container.innerHTML = "<p style='padding:15px; text-align:center;'>Nenhuma questão encontrada neste quiz.</p>";
+            return;
+        }
+
+        container.innerHTML = currentQuiz.questions.map((q, idx) => `
             <div class="question-card">
                 <div class="question-title">${idx + 1}. ${q.question}</div>
                 <div class="options-list">
@@ -155,12 +206,10 @@
     }
 
     async function submitQuiz() {
-        if (!SCRIPT_URL || SCRIPT_URL.trim() === "") {
-            return alert("Por favor, configure a URL do seu Google Apps Script dentro da variável SCRIPT_URL no arquivo HTML!");
-        }
+        if (!currentQuiz) return;
 
         let score = 0;
-        questions.forEach(q => {
+        currentQuiz.questions.forEach(q => {
             const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
             const fb = document.getElementById(`feedback_${q.id}`);
             if (selected && parseInt(selected.value) === q.correct) {
@@ -169,59 +218,77 @@
                 fb.innerHTML = `<strong>Correto!</strong> ${q.explanation}`;
             } else {
                 fb.className = "feedback incorrect";
-                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.options[q.correct]}. ${q.explanation}`;
+                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.options[q.correct] || ''}. ${q.explanation}`;
             }
         });
 
-        const percentage = Math.round((score / questions.length) * 100);
-        showToast("Enviando resultado para o Google Sheets...");
+        const percentage = Math.round((score / currentQuiz.questions.length) * 100);
+        const record = {
+            data: new Date().toLocaleString("pt-BR"),
+            usuario: document.getElementById("userName").value.trim() || "Anônimo",
+            quiz: currentQuiz.title,
+            acertos: score,
+            total: currentQuiz.questions.length,
+            porcentagem: percentage
+        };
+
+        showToast("Enviando resultado...");
+        
+        // Adiciona localmente no histórico
+        allHistory.push(record);
+        renderHistoryTable();
 
         try {
             await fetch(SCRIPT_URL, {
                 method: "POST",
                 mode: "no-cors",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    usuario: document.getElementById("userName").value.trim() || "Anônimo",
-                    acertos: score,
-                    total: questions.length,
-                    porcentagem: percentage,
-                    data: new Date().toLocaleString("pt-BR")
-                })
+                body: JSON.stringify(record)
             });
-
-            showToast("Salvo com sucesso no Google Sheets!");
+            showToast("Resultado salvo na planilha!");
         } catch (e) {
-            showToast("Erro ao enviar resultado.");
+            showToast("Erro ao salvar resultado.");
         }
     }
 
-    async function loadHistory() {
+    function renderHistoryTable() {
+        const filterVal = document.getElementById("historyFilter").value;
         const tbody = document.getElementById("historyTableBody");
-        if (!SCRIPT_URL || SCRIPT_URL.trim() === "") {
-            return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">URL do Script não configurada no código.</td></tr>`;
+
+        let filteredHistory = allHistory;
+        if (filterVal !== "ALL") {
+            filteredHistory = allHistory.filter(h => h.quiz === filterVal);
         }
 
-        try {
-            const res = await fetch(SCRIPT_URL);
-            const data = await res.json();
-            
-            if (!data || data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Nenhum teste registrado.</td></tr>`;
-
-            tbody.innerHTML = data.slice().reverse().map(row => `
-                <tr>
-                    <td>${row.data}</td><td>${row.usuario}</td><td>${row.acertos}</td><td>${row.total}</td>
-                    <td><strong>${row.porcentagem}%</strong></td>
-                </tr>
-            `).join('');
-
-            updateDashboard(data);
-        } catch (e) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Erro ao buscar dados da planilha.</td></tr>`;
+        if (filteredHistory.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Nenhum teste registrado para essa seleção.</td></tr>`;
+            updateDashboard([]);
+            return;
         }
+
+        tbody.innerHTML = filteredHistory.slice().reverse().map(row => `
+            <tr>
+                <td>${row.data}</td>
+                <td>${row.usuario}</td>
+                <td><strong>${row.quiz}</strong></td>
+                <td>${row.acertos}</td>
+                <td>${row.total}</td>
+                <td><strong>${row.porcentagem}%</strong></td>
+            </tr>
+        `).join('');
+
+        updateDashboard(filteredHistory);
     }
 
     function updateDashboard(data) {
+        if (data.length === 0) {
+            document.getElementById("statTotalTests").innerText = "0";
+            document.getElementById("statAvgScore").innerText = "0%";
+            document.getElementById("statMaxScore").innerText = "0%";
+            if (chartInstance) chartInstance.destroy();
+            return;
+        }
+
         document.getElementById("statTotalTests").innerText = data.length;
         const avg = Math.round(data.reduce((acc, c) => acc + parseInt(c.porcentagem), 0) / data.length);
         document.getElementById("statAvgScore").innerText = `${avg}%`;
