@@ -127,11 +127,12 @@
 <div id="toast"></div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxQEcx7RZgjUxvBYCNyLwCE1TKW4KpFLpKLKXUhApUpoUXb471hrqjtneLDd3W1aFNF/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzvSQOLvrr-g3aWdWrWECT4hgDcnu3_27O9WbbSlxqUKe_z6owDZeww0MEA3DyLANgjA/exec";
 
     let allQuizzes = [];
     let allHistory = [];
     let currentQuiz = null;
+    let activeQuestions = []; // Armazena as questões e opções embaralhadas para a rodada atual
     let chartInstance = null;
 
     document.addEventListener("DOMContentLoaded", () => {
@@ -143,6 +144,16 @@
         document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
         document.getElementById(tabId).classList.add("active");
         btn.classList.add("active");
+    }
+
+    // Algoritmo Fisher-Yates para embaralhamento aleatório
+    function shuffleArray(array) {
+        const arr = [...array];
+        for (let i = arr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
     }
 
     async function loadDataFromSheets() {
@@ -187,14 +198,29 @@
         const container = document.getElementById("questionsContainer");
         if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
             container.innerHTML = "<p style='padding:15px; text-align:center;'>Nenhuma questão encontrada neste quiz.</p>";
+            activeQuestions = [];
             return;
         }
 
-        container.innerHTML = currentQuiz.questions.map((q, idx) => `
+        // Embaralha as questões e também as opções dentro de cada questão
+        const shuffledQuestions = shuffleArray(currentQuiz.questions);
+        activeQuestions = shuffledQuestions.map(q => {
+            const optionsMapped = q.options.map((opt, idx) => ({ text: opt, isCorrect: idx === q.correct }));
+            const shuffledOpts = shuffleArray(optionsMapped);
+            const newCorrectIdx = shuffledOpts.findIndex(o => o.isCorrect);
+
+            return {
+                ...q,
+                displayOptions: shuffledOpts.map(o => o.text),
+                displayCorrect: newCorrectIdx
+            };
+        });
+
+        container.innerHTML = activeQuestions.map((q, idx) => `
             <div class="question-card">
                 <div class="question-title">${idx + 1}. ${q.question}</div>
                 <div class="options-list">
-                    ${q.options.map((opt, oIdx) => `
+                    ${q.displayOptions.map((opt, oIdx) => `
                         <label class="option-item">
                             <input type="radio" name="q_${q.id}" value="${oIdx}"> <span>${opt}</span>
                         </label>
@@ -206,35 +232,34 @@
     }
 
     async function submitQuiz() {
-        if (!currentQuiz) return;
+        if (!currentQuiz || activeQuestions.length === 0) return;
 
         let score = 0;
-        currentQuiz.questions.forEach(q => {
+        activeQuestions.forEach(q => {
             const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
             const fb = document.getElementById(`feedback_${q.id}`);
-            if (selected && parseInt(selected.value) === q.correct) {
+            if (selected && parseInt(selected.value) === q.displayCorrect) {
                 score++;
                 fb.className = "feedback correct";
                 fb.innerHTML = `<strong>Correto!</strong> ${q.explanation}`;
             } else {
                 fb.className = "feedback incorrect";
-                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.options[q.correct] || ''}. ${q.explanation}`;
+                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.displayOptions[q.displayCorrect] || ''}. ${q.explanation}`;
             }
         });
 
-        const percentage = Math.round((score / currentQuiz.questions.length) * 100);
+        const percentage = Math.round((score / activeQuestions.length) * 100);
         const record = {
             data: new Date().toLocaleString("pt-BR"),
             usuario: document.getElementById("userName").value.trim() || "Anônimo",
             quiz: currentQuiz.title,
             acertos: score,
-            total: currentQuiz.questions.length,
+            total: activeQuestions.length,
             porcentagem: percentage
         };
 
         showToast("Enviando resultado...");
         
-        // Adiciona localmente no histórico
         allHistory.push(record);
         renderHistoryTable();
 
