@@ -41,6 +41,8 @@
 
         .btn { background: var(--primary); color: white; border: none; padding: 12px 24px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; }
         .btn:hover { background: var(--primary-hover); }
+        .btn-sm { background: var(--primary); color: white; border: none; padding: 6px 12px; font-size: 0.85rem; font-weight: 600; border-radius: 6px; cursor: pointer; }
+        .btn-sm:hover { background: var(--primary-hover); }
 
         .feedback { margin-top: 10px; padding: 10px; border-radius: 6px; font-size: 0.9rem; display: none; }
         .feedback.correct { background: #dcfce7; color: #15803d; display: block; }
@@ -54,7 +56,19 @@
         th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
         th { background: #f1f5f9; }
         
-        #toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; background: #1e293b; color: white; border-radius: 8px; display: none; }
+        #toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; background: #1e293b; color: white; border-radius: 8px; display: none; z-index: 1000; }
+
+        /* Modal de Detalhes */
+        .modal { display: none; position: fixed; z-index: 999; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); overflow: auto; }
+        .modal-content { background-color: #fff; margin: 5% auto; padding: 24px; border-radius: var(--radius); max-width: 750px; width: 90%; position: relative; max-height: 85vh; overflow-y: auto; }
+        .close-btn { position: absolute; right: 20px; top: 15px; font-size: 1.8rem; cursor: pointer; color: var(--text-muted); }
+        .close-btn:hover { color: var(--text); }
+        .detail-item { padding: 14px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px; }
+        .detail-item.correct-bg { border-left: 5px solid #22c55e; background: #f0fdf4; }
+        .detail-item.incorrect-bg { border-left: 5px solid #ef4444; background: #fef2f2; }
+        .badge { display: inline-block; padding: 2px 8px; font-size: 0.75rem; font-weight: 700; border-radius: 4px; margin-left: 8px; }
+        .badge.correct { background: #dcfce7; color: #15803d; }
+        .badge.incorrect { background: #fee2e2; color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -113,14 +127,24 @@
             <div style="overflow-x: auto;">
                 <table>
                     <thead>
-                        <tr><th>Data/Hora</th><th>Usuário</th><th>Quiz</th><th>Acertos</th><th>Total</th><th>Aproveitamento</th></tr>
+                        <tr><th>Data/Hora</th><th>Usuário</th><th>Quiz</th><th>Acertos</th><th>Total</th><th>Aproveitamento</th><th>Ações</th></tr>
                     </thead>
                     <tbody id="historyTableBody">
-                        <tr><td colspan="6" style="text-align:center;">Carregando histórico...</td></tr>
+                        <tr><td colspan="7" style="text-align:center;">Carregando histórico...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- MODAL DE DETALHES -->
+<div id="detailsModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="closeModal()">&times;</span>
+        <h2 id="modalHeaderTitle" style="margin-bottom: 6px;">Análise do Simulado</h2>
+        <p id="modalSubTitle" style="color: var(--text-muted); margin-bottom: 20px;"></p>
+        <div id="modalDetailsContent"></div>
     </div>
 </div>
 
@@ -240,11 +264,25 @@
         if (!activeQuestions || activeQuestions.length === 0) return;
 
         let score = 0;
+        let detalhes = [];
+
         activeQuestions.forEach(q => {
             const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
             const fb = document.getElementById(`feedback_${q.id}`);
-            if (selected && parseInt(selected.value) === q.correct) {
-                score++;
+            const userAnsIdx = selected ? parseInt(selected.value) : -1;
+            const isCorrect = userAnsIdx === q.correct;
+
+            if (isCorrect) score++;
+
+            detalhes.push({
+                questao: q.question,
+                respostaAluno: userAnsIdx >= 0 ? q.options[userAnsIdx] : "Não respondeu",
+                respostaCorreta: q.options[q.correct] || "",
+                ehCorreto: isCorrect,
+                explicacao: q.explanation || ""
+            });
+
+            if (isCorrect) {
                 fb.className = "feedback correct";
                 fb.innerHTML = `<strong>Correto!</strong> ${q.explanation}`;
             } else {
@@ -260,7 +298,8 @@
             quiz: currentQuiz.title,
             acertos: score,
             total: activeQuestions.length,
-            porcentagem: percentage
+            porcentagem: percentage,
+            detalhes: detalhes
         };
 
         showToast("Enviando resultado...");
@@ -291,12 +330,16 @@
         }
 
         if (filteredHistory.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Nenhum teste registrado para essa seleção.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;">Nenhum teste registrado para essa seleção.</td></tr>`;
             updateDashboard([]);
             return;
         }
 
-        tbody.innerHTML = filteredHistory.slice().reverse().map(row => `
+        const reversedFiltered = filteredHistory.slice().reverse();
+
+        tbody.innerHTML = reversedFiltered.map((row) => {
+            const realIndex = allHistory.indexOf(row);
+            return `
             <tr>
                 <td>${row.data}</td>
                 <td>${row.usuario}</td>
@@ -304,10 +347,56 @@
                 <td>${row.acertos}</td>
                 <td>${row.total}</td>
                 <td><strong>${row.porcentagem}%</strong></td>
+                <td>
+                    <button class="btn-sm" onclick="openDetails(${realIndex})">🔍 Ver Respostas</button>
+                </td>
             </tr>
-        `).join('');
+        `}).join('');
 
         updateDashboard(filteredHistory);
+    }
+
+    function openDetails(historyIndex) {
+        const record = allHistory[historyIndex];
+        if (!record) return;
+
+        document.getElementById("modalHeaderTitle").innerText = `Desempenho: ${record.usuario}`;
+        document.getElementById("modalSubTitle").innerText = `Quiz: ${record.quiz} | Data: ${record.data} | Resultado: ${record.acertos}/${record.total} (${record.porcentagem}%)`;
+
+        const detailsContainer = document.getElementById("modalDetailsContent");
+
+        if (!record.detalhes || record.detalhes.length === 0) {
+            detailsContainer.innerHTML = "<p style='text-align:center; padding: 20px;'>Não há detalhes gravados para este registro antigo.</p>";
+        } else {
+            detailsContainer.innerHTML = record.detalhes.map((item, idx) => `
+                <div class="detail-item ${item.ehCorreto ? 'correct-bg' : 'incorrect-bg'}">
+                    <p style="font-weight:600; margin-bottom: 6px;">
+                        ${idx + 1}. ${item.questao}
+                        <span class="badge ${item.ehCorreto ? 'correct' : 'incorrect'}">
+                            ${item.ehCorreto ? 'ACERTOU' : 'ERROU'}
+                        </span>
+                    </p>
+                    <p style="font-size:0.95rem; margin-bottom: 4px;">
+                        <strong>Resposta do Aluno:</strong> ${item.respostaAluno}
+                    </p>
+                    ${!item.ehCorreto ? `<p style="font-size:0.95rem; color:#b91c1c; margin-bottom: 4px;"><strong>Resposta Correta:</strong> ${item.respostaCorreta}</p>` : ''}
+                    ${item.explicacao ? `<p style="font-size:0.85rem; color:var(--text-muted); margin-top:6px;"><em>Explicação: ${item.explicacao}</em></p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        document.getElementById("detailsModal").style.display = "block";
+    }
+
+    function closeModal() {
+        document.getElementById("detailsModal").style.display = "none";
+    }
+
+    window.onclick = function(event) {
+        const modal = document.getElementById("detailsModal");
+        if (event.target === modal) {
+            modal.style.display = "none";
+        }
     }
 
     function updateDashboard(data) {
