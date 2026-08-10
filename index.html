@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plataforma de Simulados & Desempenho</title>
+    <!-- Chart.js para visualização do gráfico na aba de histórico -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding: 20px; line-height: 1.6; }
+        .container { max-width: 900px; margin: 0 auto; }
+        
+        header { text-align: center; margin-bottom: 24px; }
+        header h1 { font-size: 2rem; color: #0f172a; }
+
+        .config-box {
+            background: #f1f5f9; border: 1px solid var(--border);
+            padding: 14px 18px; border-radius: var(--radius); margin-bottom: 20px;
+        }
+        .config-box input { width: 100%; padding: 8px 12px; margin-top: 6px; border-radius: 6px; border: 1px solid #cbd5e1; }
+
+        /* Abas */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 2px solid var(--border); }
+        .tab-btn { background: none; border: none; padding: 10px 20px; font-size: 1rem; font-weight: 600; color: var(--text-muted); cursor: pointer; border-bottom: 3px solid transparent; }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Cards e Questões */
+        .card { background: var(--card-bg); border-radius: var(--radius); padding: 24px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+        .question-card { margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+        .question-title { font-weight: 600; font-size: 1.1rem; margin-bottom: 12px; }
+        .options-list { display: flex; flex-direction: column; gap: 8px; }
+        .option-item { display: flex; align-items: center; padding: 10px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+        .option-item input { margin-right: 12px; }
+
+        .btn { background: var(--primary); color: white; border: none; padding: 12px 24px; font-size: 1rem; font-weight: 600; border-radius: 8px; cursor: pointer; width: 100%; }
+        .btn:hover { background: var(--primary-hover); }
+
+        .feedback { margin-top: 10px; padding: 10px; border-radius: 6px; font-size: 0.9rem; display: none; }
+        .feedback.correct { background: #dcfce7; color: #15803d; display: block; }
+        .feedback.incorrect { background: #fee2e2; color: #b91c1c; display: block; }
+
+        /* Estatísticas */
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .stat-card { background: #f8fafc; border: 1px solid var(--border); padding: 16px; border-radius: var(--radius); text-align: center; }
+        .stat-card p { font-size: 1.8rem; font-weight: 700; color: var(--primary); }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; }
+        
+        #toast { position: fixed; bottom: 20px; right: 20px; padding: 12px 20px; background: #1e293b; color: white; border-radius: 8px; display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>🎯 Plataforma de Simulados</h1>
+        <p>Responda às questões e acompanhe seu desempenho</p>
+    </header>
+
+    <div class="config-box">
+        <label for="scriptUrl"><strong>URL do Google Apps Script:</strong></label>
+        <input type="text" id="scriptUrl" placeholder="Cole a URL do seu Web App aqui..." onchange="saveScriptUrl()">
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('quiz-tab', this)">📝 Realizar Simulado</button>
+        <button class="tab-btn" onclick="switchTab('history-tab', this); loadHistory();">📊 Histórico & Desempenho</button>
+    </div>
+
+    <!-- ABA 1: SIMULADO -->
+    <div id="quiz-tab" class="tab-content active">
+        <div class="card">
+            <div style="margin-bottom: 16px;">
+                <label><strong>Seu Nome / Identificação:</strong></label>
+                <input type="text" id="userName" style="width:100%; padding:8px; margin-top:4px;" value="Aluno">
+            </div>
+            <div id="questionsContainer"></div>
+            <button class="btn" onclick="submitQuiz()">Finalizar e Salvar Resultado</button>
+        </div>
+    </div>
+
+    <!-- ABA 2: HISTÓRICO & DESEMPENHO -->
+    <div id="history-tab" class="tab-content">
+        <div class="stats-grid">
+            <div class="stat-card"><h3>Total de Testes</h3><p id="statTotalTests">0</p></div>
+            <div class="stat-card"><h3>Média Geral</h3><p id="statAvgScore">0%</p></div>
+            <div class="stat-card"><h3>Maior Nota</h3><p id="statMaxScore">0%</p></div>
+        </div>
+
+        <div class="card">
+            <h3>Evolução das Notas (%)</h3>
+            <canvas id="performanceChart" height="100"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>Histórico no Google Sheets</h3>
+            <div style="overflow-x: auto;">
+                <table>
+                    <thead>
+                        <tr><th>Data/Hora</th><th>Usuário</th><th>Acertos</th><th>Total</th><th>Aproveitamento</th></tr>
+                    </thead>
+                    <tbody id="historyTableBody">
+                        <tr><td colspan="5" style="text-align:center;">Carregando histórico...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    const questions = [
+        { id: 1, question: "Ao lançar um dado honesto de 6 faces, qual é a probabilidade de obter um número primo?", options: ["1/6", "1/3", "1/2", "2/3", "5/6"], correct: 2, explanation: "Os números primos são 2, 3 e 5. Logo, 3/6 = 1/2." },
+        { id: 2, question: "Em uma urna há 5 bolas vermelhas, 3 azuis e 2 amarelas. Retirando uma bola ao acaso, qual a probabilidade de NÃO ser azul?", options: ["20%", "30%", "50%", "70%", "80%"], correct: 3, explanation: "Bolas não azuis = 7 de 10. Logo, 7/10 = 70%." },
+        { id: 3, question: "Dois dados são lançados. Qual a probabilidade de a soma ser igual a 7?", options: ["1/36", "1/12", "1/6", "5/36", "1/4"], correct: 2, explanation: "São 6 combinações favoráveis de 36. 6/36 = 1/6." }
+    ];
+
+    let chartInstance = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        document.getElementById("scriptUrl").value = localStorage.getItem("googleScriptUrl") || "";
+        renderQuiz();
+    });
+
+    function saveScriptUrl() {
+        localStorage.setItem("googleScriptUrl", document.getElementById("scriptUrl").value.trim());
+        showToast("URL salva com sucesso!");
+    }
+
+    function switchTab(tabId, btn) {
+        document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+        document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+        document.getElementById(tabId).classList.add("active");
+        btn.classList.add("active");
+    }
+
+    function renderQuiz() {
+        const container = document.getElementById("questionsContainer");
+        container.innerHTML = questions.map((q, idx) => `
+            <div class="question-card">
+                <div class="question-title">${idx + 1}. ${q.question}</div>
+                <div class="options-list">
+                    ${q.options.map((opt, oIdx) => `
+                        <label class="option-item">
+                            <input type="radio" name="q_${q.id}" value="${oIdx}"> <span>${opt}</span>
+                        </label>
+                    `).join('')}
+                </div>
+                <div class="feedback" id="feedback_${q.id}"></div>
+            </div>
+        `).join('');
+    }
+
+    async function submitQuiz() {
+        const scriptUrl = localStorage.getItem("googleScriptUrl");
+        if (!scriptUrl) return alert("Por favor, cole a URL do Google Apps Script!");
+
+        let score = 0;
+        questions.forEach(q => {
+            const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
+            const fb = document.getElementById(`feedback_${q.id}`);
+            if (selected && parseInt(selected.value) === q.correct) {
+                score++;
+                fb.className = "feedback correct";
+                fb.innerHTML = `<strong>Correto!</strong> ${q.explanation}`;
+            } else {
+                fb.className = "feedback incorrect";
+                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.options[q.correct]}. ${q.explanation}`;
+            }
+        });
+
+        const percentage = Math.round((score / questions.length) * 100);
+        showToast("Enviando resultado para o Google Sheets...");
+
+        await fetch(scriptUrl, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                usuario: document.getElementById("userName").value.trim() || "Anônimo",
+                acertos: score,
+                total: questions.length,
+                porcentagem: percentage,
+                data: new Date().toLocaleString("pt-BR")
+            })
+        });
+
+        showToast("Salvo com sucesso no Google Sheets!");
+    }
+
+    async function loadHistory() {
+        const scriptUrl = localStorage.getItem("googleScriptUrl");
+        const tbody = document.getElementById("historyTableBody");
+        if (!scriptUrl) return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Configure a URL do Script.</td></tr>`;
+
+        try {
+            const res = await fetch(scriptUrl);
+            const data = await res.json();
+            
+            if (data.length === 0) return tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;">Nenhum teste registrado.</td></tr>`;
+
+            tbody.innerHTML = data.slice().reverse().map(row => `
+                <tr>
+                    <td>${row.data}</td><td>${row.usuario}</td><td>${row.acertos}</td><td>${row.total}</td>
+                    <td><strong>${row.porcentagem}%</strong></td>
+                </tr>
+            `).join('');
+
+            updateDashboard(data);
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Erro ao buscar dados da planilha.</td></tr>`;
+        }
+    }
+
+    function updateDashboard(data) {
+        document.getElementById("statTotalTests").innerText = data.length;
+        const avg = Math.round(data.reduce((acc, c) => acc + parseInt(c.porcentagem), 0) / data.length);
+        document.getElementById("statAvgScore").innerText = `${avg}%`;
+        document.getElementById("statMaxScore").innerText = `${Math.max(...data.map(d => parseInt(d.porcentagem)))}%`;
+
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        if (chartInstance) chartInstance.destroy();
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => d.data ? d.data.split(",")[0] : ""),
+                datasets: [{ label: 'Aproveitamento (%)', data: data.map(d => parseInt(d.porcentagem)), borderColor: '#2563eb', fill: true, backgroundColor: 'rgba(37,99,235,0.1)' }]
+            },
+            options: { scales: { y: { min: 0, max: 100 } } }
+        });
+    }
+
+    function showToast(msg) {
+        const t = document.getElementById("toast");
+        t.innerText = msg; t.style.display = "block";
+        setTimeout(() => t.style.display = "none", 3000);
+    }
+</script>
+</body>
+</html>
