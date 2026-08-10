@@ -132,21 +132,13 @@
     let allQuizzes = [];
     let allHistory = [];
     let currentQuiz = null;
-    let activeQuestions = []; // Armazena as questões e opções embaralhadas para a rodada atual
+    let activeQuestions = [];
     let chartInstance = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         loadDataFromSheets();
     });
 
-    function switchTab(tabId, btn) {
-        document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
-        document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
-        document.getElementById(tabId).classList.add("active");
-        btn.classList.add("active");
-    }
-
-    // Algoritmo Fisher-Yates para embaralhamento aleatório
     function shuffleArray(array) {
         const arr = [...array];
         for (let i = arr.length - 1; i > 0; i--) {
@@ -154,6 +146,13 @@
             [arr[i], arr[j]] = [arr[j], arr[i]];
         }
         return arr;
+    }
+
+    function switchTab(tabId, btn) {
+        document.querySelectorAll(".tab-content").forEach(el => el.classList.remove("active"));
+        document.querySelectorAll(".tab-btn").forEach(el => el.classList.remove("active"));
+        document.getElementById(tabId).classList.add("active");
+        btn.classList.add("active");
     }
 
     async function loadDataFromSheets() {
@@ -202,17 +201,23 @@
             return;
         }
 
-        // Embaralha as questões e também as opções dentro de cada questão
         const shuffledQuestions = shuffleArray(currentQuiz.questions);
+
         activeQuestions = shuffledQuestions.map(q => {
-            const optionsMapped = q.options.map((opt, idx) => ({ text: opt, isCorrect: idx === q.correct }));
+            const optionsMapped = q.options.map((opt, oIdx) => ({
+                text: opt,
+                isCorrect: oIdx === q.correct
+            }));
+
             const shuffledOpts = shuffleArray(optionsMapped);
-            const newCorrectIdx = shuffledOpts.findIndex(o => o.isCorrect);
+            const newCorrectIdx = shuffledOpts.findIndex(opt => opt.isCorrect);
 
             return {
-                ...q,
-                displayOptions: shuffledOpts.map(o => o.text),
-                displayCorrect: newCorrectIdx
+                id: q.id,
+                question: q.question,
+                options: shuffledOpts.map(opt => opt.text),
+                correct: newCorrectIdx,
+                explanation: q.explanation
             };
         });
 
@@ -220,7 +225,7 @@
             <div class="question-card">
                 <div class="question-title">${idx + 1}. ${q.question}</div>
                 <div class="options-list">
-                    ${q.displayOptions.map((opt, oIdx) => `
+                    ${q.options.map((opt, oIdx) => `
                         <label class="option-item">
                             <input type="radio" name="q_${q.id}" value="${oIdx}"> <span>${opt}</span>
                         </label>
@@ -232,19 +237,19 @@
     }
 
     async function submitQuiz() {
-        if (!currentQuiz || activeQuestions.length === 0) return;
+        if (!activeQuestions || activeQuestions.length === 0) return;
 
         let score = 0;
         activeQuestions.forEach(q => {
             const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
             const fb = document.getElementById(`feedback_${q.id}`);
-            if (selected && parseInt(selected.value) === q.displayCorrect) {
+            if (selected && parseInt(selected.value) === q.correct) {
                 score++;
                 fb.className = "feedback correct";
                 fb.innerHTML = `<strong>Correto!</strong> ${q.explanation}`;
             } else {
                 fb.className = "feedback incorrect";
-                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.displayOptions[q.displayCorrect] || ''}. ${q.explanation}`;
+                fb.innerHTML = `<strong>Incorreto.</strong> Resposta correta: ${q.options[q.correct] || ''}. ${q.explanation}`;
             }
         });
 
